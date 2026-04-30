@@ -6,7 +6,7 @@ from datetime import datetime
 import pika
 from pika.exceptions import AMQPConnectionError, ChannelClosedByBroker
 
-from config import RABBITMQ_HOST, RABBITMQ_USER, RABBITMQ_PASS
+from .config import RABBITMQ_HOST, RABBITMQ_PASS, RABBITMQ_USER
 
 
 class ClientProducer:
@@ -50,6 +50,7 @@ class ClientProducer:
         ClientProducer._client_id += 1
         retries = 5
         self._connected = False
+        self._connection = None
 
         for i in range(retries):
             try:
@@ -69,8 +70,11 @@ class ClientProducer:
                     on_message_callback=self._on_response,
                     auto_ack=True
                 )
+
                 print("ClientProducer: Successfully connected to RabbitMQ and bound queue.")
+                self._connected = True
                 break
+
             except (AMQPConnectionError, ChannelClosedByBroker) as e:
                 print(f"ClientProducer: RabbitMQ connection/channel error on attempt {i + 1}/{retries}: {e}")
                 if self._connection and self._connection.is_open:
@@ -82,9 +86,9 @@ class ClientProducer:
                     self._connection.close()
                 time.sleep(2 ** i)
 
-            if not self._connected:
-                # This block is now correctly reachable if the loop finishes without 'break'
-                raise Exception("ClientProducer: Failed to connect and bind to RabbitMQ after multiple retries.")
+        if not self._connected:
+            # This block is now correctly reachable if the loop finishes without 'break'
+            raise Exception("ClientProducer: Failed to connect and bind to RabbitMQ after multiple retries.")
 
         self._inventory = None
         self._corr_id = None
@@ -92,7 +96,7 @@ class ClientProducer:
     def _on_response(self, ch, method, properties, body):
         """
             Callback method invoked by pika when a message is received on the _callback_queue.
-            This method processes responses to outstanding inventory requests.
+            This method processes responses to inventory requests.
 
             Args:
                 ch (pika.channel.Channel): The channel object from which the message was received.
@@ -208,4 +212,5 @@ class ClientProducer:
                 print('\nOrder cancelled.')
                 return []
 
-        self._send_order(order_list)
+        if order_list:
+            self._send_order(order_list)

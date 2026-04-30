@@ -1,8 +1,8 @@
 import json
 import pika
 
-from config import RABBITMQ_HOST, RABBITMQ_USER, RABBITMQ_PASS
-from models import Product
+from .config import RABBITMQ_HOST, RABBITMQ_USER, RABBITMQ_PASS
+from .models import Product
 
 
 class DbConsumer:
@@ -61,13 +61,20 @@ class DbConsumer:
             order = json.loads(body.decode('utf-8'))
             with self._SessionLocal() as session:
                 for order_item in order['order']:
+
                     item_name = order_item['name']
                     item_quantity = order_item['quantity']
                     print(item_name, item_quantity)
-                    product = session.query(Product).filter(Product.name == item_name).one()
-                    print(f'\nOld data: Name - {product.name}, Amount - {product.amount}')
-                    product.amount -= item_quantity
-                    print(f'\nNew Data: Name - {product.name}, Amount - {product.amount}')
+
+                    product = session.query(Product).filter(Product.name == item_name).first()
+                    #print(f'\nOld data: Name - {product.name}, Amount - {product.amount}')
+                    if product:
+                        product.amount -= item_quantity
+                    else:
+                        print(f"Error: Product {item_name} not found in database. Skipping item.")
+
+                    #print(f'\nNew Data: Name - {product.name}, Amount - {product.amount}')
+
                 session.commit()
 
             with self._SessionLocal() as session:
