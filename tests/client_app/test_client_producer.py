@@ -5,6 +5,7 @@ import pytest
 from pika.exceptions import AMQPConnectionError
 
 from client_app.client_producer import ClientProducer
+from tests.test_data import FAKE_INVENTORY_DICT
 
 
 @pytest.fixture
@@ -25,12 +26,6 @@ def mock_producer(mocker):
     ClientProducer._client_id = 0
 
     return producer, mock_channel, mock_conn
-
-
-fake_inventory = {
-    "Laptop": {"price": 1000, "amount": 5},
-    "Mouse": {"price": 100, "amount": 10},
-}
 
 
 @pytest.mark.parametrize("user_inputs, expected_order_count", [
@@ -54,7 +49,7 @@ fake_inventory = {
 def test_collection_order_success(mock_producer, mocker, user_inputs, expected_order_count):
     producer, _, _ = mock_producer
 
-    mocker.patch.object(producer, '_get_inventory', return_value=fake_inventory)
+    mocker.patch.object(producer, '_get_inventory', return_value=FAKE_INVENTORY_DICT)
     mock_send = mocker.patch.object(producer, '_send_order')
     mocker.patch('builtins.input', side_effect=user_inputs)
 
@@ -70,7 +65,7 @@ def test_collection_order_success(mock_producer, mocker, user_inputs, expected_o
 def test_collect_order_keyboard_interrupt(mock_producer, mocker):
     producer, _, _ = mock_producer
 
-    mocker.patch.object(producer, '_get_inventory', return_value=fake_inventory)
+    mocker.patch.object(producer, '_get_inventory', return_value=FAKE_INVENTORY_DICT)
     mock_send = mocker.patch.object(producer, '_send_order')
     mocker.patch('builtins.input', side_effect=KeyboardInterrupt)
 

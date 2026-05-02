@@ -58,27 +58,41 @@ class DbConsumer:
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         elif method.routing_key == 'new_order_request':
-            order = json.loads(body.decode('utf-8'))
+
+            try:
+                order = json.loads(body.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                print(f'Malformed JSON received: {e}')
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+                return
+
             with self._SessionLocal() as session:
-                for order_item in order['order']:
+                try:
+                    for order_item in order['order']:
 
-                    item_name = order_item['name']
-                    item_quantity = order_item['quantity']
-                    print(item_name, item_quantity)
+                        item_name = order_item['name']
+                        item_quantity = order_item['quantity']
+                        print(item_name, item_quantity)
 
-                    product = session.query(Product).filter(Product.name == item_name).first()
-                    #print(f'\nOld data: Name - {product.name}, Amount - {product.amount}')
-                    if product:
+                        product = session.query(Product).filter(Product.name == item_name).first()
+                        #print(f'\nOld data: Name - {product.name}, Amount - {product.amount}')
+
+                        if not product:
+                            raise ValueError(f'Product {item_name} not found')
+
+                        if product.amount < item_quantity:
+                            raise ValueError(f'Insufficient stock for {item_name}')
+
                         product.amount -= item_quantity
-                    else:
-                        print(f"Error: Product {item_name} not found in database. Skipping item.")
+                        #print(f'\nNew Data: Name - {product.name}, Amount - {product.amount}')
 
-                    #print(f'\nNew Data: Name - {product.name}, Amount - {product.amount}')
+                    print(session.query(Product).all())
+                    session.commit()
+                    print('Order processed successfully.')
 
-                session.commit()
-
-            with self._SessionLocal() as session:
-                print(session.query(Product).all())
+                except ValueError as e:
+                    session.rollback()
+                    print(f'Order failed: {e}. Entire transaction rolled back.')
 
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
